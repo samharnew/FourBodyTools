@@ -1,0 +1,55 @@
+"ModelName"    "altModel5"
+
+"NormBF"			2
+"Default3bodyBW"	"PhaseSpace"
+"useZemachTensors"		1
+
+
+"RunningWidth_a(1)(1260)+"	"RunningWidth_a(1)(1260)+_10it.root"
+"RunningWidth_a(1)(1640)+"	"RunningWidth_a(1)(1640)+_10it.root"
+"RunningWidth_pi(2)(1670)+"	"RunningWidth_pi(2)(1670)+.root"
+"RunningWidth_pi(1300)+"	"RunningWidth_pi(1300)+_3it.root"
+
+** name								Fix?	init	step	min	max
+
+"BuggD0->a(1)(1260)+(->sigma10(->pi+,pi-),pi+),pi-_Re"   0    0.437319    0.046882
+"BuggD0->a(1)(1260)+(->sigma10(->pi+,pi-),pi+),pi-_Im"   0    0.354455    0.0425238
+"BuggD0->a(1)(1640)+(->sigma10(->pi+,pi-),pi+),pi-_Re"   0    0.0118584    0.0412842
+"BuggD0->a(1)(1640)+(->sigma10(->pi+,pi-),pi+),pi-_Im"   0    -0.184497    0.0513711
+"BuggD0->pi(1300)+(->sigma10(->pi+,pi-),pi+),pi-_Re"   0    -0.333749    0.0451889
+"BuggD0->pi(1300)+(->sigma10(->pi+,pi-),pi+),pi-_Im"   0    0.0552091    0.0354225
+"BuggD0->pi(2)(1670)+(->sigma10(->pi+,pi-),pi+),pi-_Re"   0    -0.149188    0.0303325
+"BuggD0->pi(2)(1670)+(->sigma10(->pi+,pi-),pi+),pi-_Im"   0    -0.270728    0.0347413
+"BuggGSD0->rho(770)0(->pi+,pi-),sigma10(->pi+,pi-)_Re"   0    0.348987    0.0441361
+"BuggGSD0->rho(770)0(->pi+,pi-),sigma10(->pi+,pi-)_Im"   0    -0.0949152    0.0395291
+"BuggHistoPS_30221D0->f(0)(1370)0(->pi+,pi-),sigma10(->pi+,pi-)_Re"   0    0.280292    0.0358564
+"BuggHistoPS_30221D0->f(0)(1370)0(->pi+,pi-),sigma10(->pi+,pi-)_Im"   0    0.698126    0.0586587
+"D0->pi(1300)+(->NonResV0(->pi+,pi-),pi+),pi-_Re"   0    -0.170893    0.0319518
+"D0->pi(1300)+(->NonResV0(->pi+,pi-),pi+),pi-_Im"   0    -0.372066    0.0489892
+"GSD0->a(1)(1260)+(->rho(770)0(->pi+,pi-),pi+),pi-_Re"   2    1    0
+"GSD0->a(1)(1260)+(->rho(770)0(->pi+,pi-),pi+),pi-_Im"   2    0    0
+"GSD0->a(1)(1640)+[D](->rho(770)0(->pi+,pi-),pi+),pi-_Re"   0    -0.161998    0.0434795
+"GSD0->a(1)(1640)+[D](->rho(770)0(->pi+,pi-),pi+),pi-_Im"   0    0.279554    0.0894143
+"GSD0->rho(770)0(->pi+,pi-),rho(770)0(->pi+,pi-)_Re"   0    0.0106888    0.0300742
+"GSD0->rho(770)0(->pi+,pi-),rho(770)0(->pi+,pi-)_Im"   0    0.152606    0.037073
+"GSD0[D]->rho(770)0(->pi+,pi-),rho(770)0(->pi+,pi-)_Re"   0    -0.661696    0.0520813
+"GSD0[D]->rho(770)0(->pi+,pi-),rho(770)0(->pi+,pi-)_Im"   0    0.0026157    0.0314723
+"GSD0[P]->rho(770)0(->pi+,pi-),rho(770)0(->pi+,pi-)_Re"   0    -0.0417105    0.0269463
+"GSD0[P]->rho(770)0(->pi+,pi-),rho(770)0(->pi+,pi-)_Im"   0    -0.416541    0.0258973
+"HistoPS_225D0->f(2)(1270)0(->pi+,pi-),f(2)(1270)0(->pi+,pi-)_Re"   0    -0.0773379    0.0266536
+"HistoPS_225D0->f(2)(1270)0(->pi+,pi-),f(2)(1270)0(->pi+,pi-)_Im"   0    -0.154773    0.0225438
+"HistoPS_225D0->pi(2)(1670)+(->f(2)(1270)0(->pi+,pi-),pi+),pi-_Re"   0    0.000864473    0.0287905
+"HistoPS_225D0->pi(2)(1670)+(->f(2)(1270)0(->pi+,pi-),pi+),pi-_Im"   0    0.210572    0.0263575
+"mass_a(1)(1260)+"   0    1231.11    7.83591
+"width_a(1)(1260)+"   0    459.161    19.1743
+"mass_a(1)(1640)+"   0    1643.69    15.3462
+"width_a(1)(1640)+"   0    221.121    69.876
+"mass_pi(1300)+"   0    1180.45    13.3536
+"width_pi(1300)+"   0    297.429    20.1344
+"mass_f(0)(1370)0"   2    1475    0
+"width_f(0)(1370)0"   2    113    0
+"a1_Re"   0    0.319438    0.0367814
+"a1_Im"   0    0.107119    0.0280957
+"pi_Re"   0    0.194918    0.115322
+"pi_Im"   0    -0.59099    0.0727543
+
