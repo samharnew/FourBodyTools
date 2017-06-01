@@ -28,61 +28,43 @@ const int comp_pi1670pTof2    = 13;
 const int comp_a1260mToSigma  = 14; 
 const int comp_a1260mToRho    = 15; 
 
+TString g_outdir = "";
 
 
+TString GetToyMCDir(TString modelName, TString uniqueTag, int seed ){
 
-
-
-void generateToyMC(int seed){
-
-  int nEvents = 100000;
-  
-  PhilippeModelWrapper* fasPhilWrapper = PhilippeModelWrapper::getStaticWrapper();
-  fasPhilWrapper->resetModel();
-
-  TString outdir = "toyMC/";
-  outdir += fasPhilWrapper->getModelName();
-  outdir += "_";
-  outdir += seed;
-  outdir += ".root";
-
-  MINT::counted_ptr<FitAmpSum> fas   = fasPhilWrapper->getFitAmpSum  ();    
-
-  DalitzEventPattern pat(421, -211, 211, 211, -211);
-
-  TRandom3 randomGen(seed);
-
-  SignalGenerator signalGenerator(pat, fas.get(), &randomGen);
-  DalitzEventList eventList;
-  signalGenerator.FillEventList(eventList, nEvents);
-  eventList.save( outdir.Data() );
-
-}
-
-void generateCPVToyMC(int seed, int comp, std::complex<double> delta, TString uniqueTag ){
-
-  int nEvents = 100000;
-  
-  PhilippeModelWrapper* fasPhilWrapper = PhilippeModelWrapper::getStaticWrapper();
-  fasPhilWrapper->resetModel();
-  MINT::counted_ptr<FitAmpSum> fas   = fasPhilWrapper->getFitAmpSum  ();    
-
-  TString outdir = "toyCPVMC/";
-  outdir += fasPhilWrapper->getModelName();
+  TString outdir = g_outdir + "toyMC/";
+  gSystem->Exec("mkdir -p " + outdir);
+  outdir += modelName;
   outdir += "_";
   outdir += uniqueTag;
-  outdir += "_comp-";
-  outdir += comp;
-  outdir += "_seed-";
-  outdir += seed;
+  if (seed != -1){
+    outdir += "_seed-";
+    outdir += seed;
+  }
   outdir += ".root";
   
-  std::complex<double> mult = 1.0+delta;
+  return outdir;
+}
+
+void GenerateToyMC(int seed, int comp, std::complex<double> delta, TString uniqueTag ){
   
-  std::cout << "Just checking" << std::endl;
+  int nEvents = 100000;
+  
+  //Get the model
+  PhilippeModelWrapper* fasPhilWrapper = PhilippeModelWrapper::getStaticWrapper();
+  fasPhilWrapper->resetModel();
+  MINT::counted_ptr<FitAmpSum> fas   = fasPhilWrapper->getFitAmpSum  ();    
+  
+
+  TString outdir = GetToyMCDir( fasPhilWrapper->getModelName(), uniqueTag, seed );
+  
+  //mulitply the given component to inject CPV
+  std::complex<double> mult = 1.0+delta;
   fas->getAmpPtr(comp)->print();
   fas->getAmpPtr(comp)->multiply(mult);
-  std::cout << "Just checking" << std::endl;
+  
+  //Generate according to this model and save
 
   DalitzEventPattern pat(421, -211, 211, 211, -211);
 
@@ -97,58 +79,43 @@ void generateCPVToyMC(int seed, int comp, std::complex<double> delta, TString un
 
   
 
-void compareDandDbarSamples(){
+void CPVTest(TString uniqueTag1, TString uniqueTag2){
   
-  std::map<int, std::vector<int> > componentAmps;
-  componentAmps[0 ].push_back(0);
-  componentAmps[0 ].push_back(7);
-  componentAmps[1 ].push_back(1);
-  componentAmps[2 ].push_back(2);
-  componentAmps[3 ].push_back(3);
-  componentAmps[4 ].push_back(4);
-  componentAmps[5 ].push_back(5);
-  componentAmps[6 ].push_back(6);
-  componentAmps[7 ].push_back(8);
-  componentAmps[8 ].push_back(9);
-  componentAmps[9 ].push_back(10);
-  componentAmps[10].push_back(11);
-  componentAmps[11].push_back(12);
-  componentAmps[12].push_back(13);
-  componentAmps[13].push_back(14);
-  componentAmps[13].push_back(15);
-
   PhilippeModelWrapper* fasPhilWrapper = PhilippeModelWrapper::getStaticWrapper();
   fasPhilWrapper->resetModel();  
   MINT::counted_ptr<FitAmpSum> fas   = fasPhilWrapper->getFitAmpSum  ();    
   
   DalitzEventPattern pat(421, -211, 211, 211, -211);
 
-  
   DalitzEventList eventlistdz;
   DalitzEventList eventlistdzb;
-  eventlistdz .fromFile("/Users/sh7566/Documents/Work/Code/FourBodyTools/example/development/toyMC/baseLine_1.root");
-  eventlistdzb.fromFile("/Users/sh7566/Documents/Work/Code/FourBodyTools/example/development/toyCPVMC/baseLine_2_9.root");
+  eventlistdz .fromFile( GetToyMCDir("baseLine", uniqueTag1, -1).Data() );
+  eventlistdzb.fromFile( GetToyMCDir("baseLine", uniqueTag2, -1).Data() );
   
-
   DalitzEventListWithAmps evtlistwampsDz (eventlistdz );
   DalitzEventListWithAmps evtlistwampsDzb(eventlistdzb);
   
-  for (auto i = componentAmps.begin(); i != componentAmps.end(); ++i){
-    std::vector<int>& fasIDs = i->second;
-    evtlistwampsDz .addAmp(fas.get(), fasIDs);
-    evtlistwampsDzb.addAmp(fas.get(), fasIDs);
+  for (unsigned i = 0; i < fas->size(); i++){
+    evtlistwampsDz .addAmp(fas.get(), i );
+    evtlistwampsDzb.addAmp(fas.get(), i );
   }
   evtlistwampsDz .setTotAmp(fas.get() );
   evtlistwampsDzb.setTotAmp(fas.get() );
   
   TRandom3 random(33);
+  
+  TString outdir = g_outdir;
+  outdir += "cpvTest/";
+  gSystem->Exec("mkdir -p " + outdir);
+  outdir += uniqueTag1 + "_" + uniqueTag2 + "/";
+  gSystem->Exec("mkdir -p " + outdir);
 
   ModelInspCPAsymmetry cpAys(evtlistwampsDz, evtlistwampsDzb);
-  cpAys.createBinningSchemes(100.0, 0.3*0.25, 0.05*0.25);
+  cpAys.createBinningSchemes(100.0, 0.3, 0.05);
   cpAys.doPeusdoExp(4000, &random);
-  cpAys.makeChiSqPlot("ChiSq");
+  cpAys.makeChiSqPlot(outdir + "ChiSq");
   cpAys.printChi2Breakdown();
-  cpAys.makeAysPlots("Ays");
+  cpAys.makeAysPlots(outdir + "Ays");
   
 
   //ModelInspCPVFitter fitter(evtlistwampsDz, evtlistwampsDzb);
@@ -182,51 +149,77 @@ void compareDandDbarSamples(){
 
 int main(int argc, char** argv) {
   
+  HyperPlotStyle::init();  
+
+  bool generate    =  0;
+  bool cpvTest     =  0;
+
+  int cpvOption    =  0; 
+  int seed         =  1; 
   
-  //const int comp_a1260pToSigma  = 0; 
-  //const int comp_a1640mToSigma  = 1; 
-  //const int comp_pi1300p        = 2; 
-  //const int comp_pi1300m        = 3; 
-  //const int comp_pi1670pToSigma = 4; 
-  //const int comp_rhoSigma       = 5; 
-  //const int comp_f0Sigma        = 6; 
-  //const int comp_a1260pToRho    = 7; 
-  //const int comp_a1640pToRho    = 8; 
-  //const int comp_rhoRhoS        = 9; 
-  //const int comp_rhoRhoP        = 10; 
-  //const int comp_rhoRhoD        = 11; 
-  //const int comp_f2f2           = 12;  
-  //const int comp_pi1670pTof2    = 13; 
-  //const int comp_a1260mToSigma  = 14; 
-  //const int comp_a1260mToRho    = 15; 
+   
 
-
-  HyperPlotStyle::init();
-
-  std::complex<double> mult(0.5, 0.5);
-  int seed = 2;
-  int component = 9;
-  //generateToyMC(seed);
+  for(int i = 1; i<argc; i=i+2){
   
-  double thrDeg = (3.0/180.0)*TMath::Pi();
-  double fouDeg = (4.0/180.0)*TMath::Pi();
+    //Options to do with offline selection
+    if       (std::string(argv[i])=="--generate"       ) { generate    =  1         ; i--; }
+    else if  (std::string(argv[i])=="--cpv-test"       ) { cpvTest     =  1         ; i--; }
+    else if  (std::string(argv[i])=="--cpv-opt"        ) { cpvOption   =  atoi(argv[i+1]); }
+    else if  (std::string(argv[i])=="--seed"           ) { seed        =  atoi(argv[i+1]); }
+    else if  (std::string(argv[i])=="--outdir"         ) { g_outdir    =  argv[i+1];       }
+    else { 
+      std::cout << "Entered invalid argument " << argv[i] << std::endl;
+      return 0;
+    }
+  }
   
-  std::complex<double> thrDegRot( cos(thrDeg)-1, sin(thrDeg) );
-  std::complex<double> fouDegRot( cos(fouDeg)-1, sin(fouDeg) );
-  std::complex<double> fivPerInc( 0.05, 0.0 );
-  std::complex<double> fouPerInc( 0.04, 0.0 );
+  //Some constants that are useful later
+  const double thrDeg = (3.0/180.0)*TMath::Pi();
+  const double fouDeg = (4.0/180.0)*TMath::Pi();  
+  const std::complex<double> thrDegRot( cos(thrDeg)-1, sin(thrDeg) );
+  const std::complex<double> fouDegRot( cos(fouDeg)-1, sin(fouDeg) );
+  const std::complex<double> fivPerInc( 0.05, 0.0 );
+  const std::complex<double> fouPerInc( 0.04, 0.0 );
 
-  generateCPVToyMC(seed, comp_a1260pToRho, fivPerInc, "a1-mag"     );
-  //generateCPVToyMC(seed, comp_a1260pToRho, thrDegRot, "a1-pha"     );
-  //generateCPVToyMC(seed, comp_rhoRhoD    , fivPerInc, "rhorhoD-mag");
-  //generateCPVToyMC(seed, comp_rhoRhoD    , fouDegRot, "rhorhoD-pha");  
-  //generateCPVToyMC(seed, comp_rhoRhoP    , fouPerInc, "rhorhoP-mag");
-  //generateCPVToyMC(seed, comp_rhoRhoP    , thrDegRot, "rhorhoP-pha");  
+  //What each cpvOption means 
+  std::complex<double> delta(0.0, 0.0);
+  int component    = 0;
+  TString sampleID = "nominal";
 
+  if (cpvOption == 1){
+    delta     = fivPerInc;
+    component = comp_a1260pToRho;
+    sampleID  = "a1-mag";
+  }
+  if (cpvOption == 2){
+    delta     = thrDegRot;
+    component = comp_a1260pToRho;
+    sampleID  = "a1-pha";
+  }
+  if (cpvOption == 3){
+    delta     = fivPerInc;
+    component = comp_rhoRhoD;
+    sampleID  = "rhorhoD-mag";
+  }
+  if (cpvOption == 4){
+    delta     = fouDegRot;
+    component = comp_rhoRhoD;
+    sampleID  = "rhorhoD-pha";
+  }
+  if (cpvOption == 5){
+    delta     = fouPerInc;
+    component = comp_rhoRhoP;
+    sampleID  = "rhorhoP-mag";
+  }
+  if (cpvOption == 6){
+    delta     = thrDegRot;
+    component = comp_rhoRhoP;
+    sampleID  = "rhorhoP-pha";
+  }
 
+  if (generate) GenerateToyMC(seed, component, delta, sampleID );
+  if (cpvTest ) CPVTest("nominal", sampleID);
 
-
-  //compareDandDbarSamples();
 
 
   return 0;
