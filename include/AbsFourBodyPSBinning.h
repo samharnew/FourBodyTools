@@ -11,6 +11,7 @@
 #include "TLorentzVector.h"
 #include "TRandom.h"
 #include <iostream>
+#include "Mint/DalitzEvent.h"
 
 
 class AbsFourBodyPSBinning{
@@ -21,7 +22,7 @@ class AbsFourBodyPSBinning{
 
   AbsFourBodyPSBinning();
   
-  virtual int getBinNum( DalitzEvent& evt ) const;
+  virtual int getBinNum( DalitzEvent& evt ) const = 0;
   
   int getNumBins() const;
 
