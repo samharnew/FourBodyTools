@@ -49,6 +49,8 @@ TString GetToyMCDir(TString modelName, TString uniqueTag, int seed ){
 
 void GenerateToyMC(int seed, int comp, std::complex<double> delta, TString uniqueTag ){
   
+  int modSeed = comp*1000 + seed;
+
   int nEvents = 100000;
   
   //Get the model
@@ -68,7 +70,7 @@ void GenerateToyMC(int seed, int comp, std::complex<double> delta, TString uniqu
 
   DalitzEventPattern pat(421, -211, 211, 211, -211);
 
-  TRandom3 randomGen(seed);
+  TRandom3 randomGen(modSeed);
 
   SignalGenerator signalGenerator(pat, fas.get(), &randomGen);
   DalitzEventList eventList;
@@ -111,7 +113,7 @@ void CPVTest(TString uniqueTag1, TString uniqueTag2){
   gSystem->Exec("mkdir -p " + outdir);
 
   ModelInspCPAsymmetry cpAys(evtlistwampsDz, evtlistwampsDzb);
-  cpAys.createBinningSchemes(100.0, 0.3, 0.05);
+  cpAys.createBinningSchemes(100.0, 0.35, 0.06);
   cpAys.doPeusdoExp(4000, &random);
   cpAys.makeChiSqPlot(outdir + "ChiSq");
   cpAys.printChi2Breakdown();
@@ -146,6 +148,20 @@ void CPVTest(TString uniqueTag1, TString uniqueTag2){
 
 }
 
+void HAddSamples(int lowseed, int highseed, TString sampleID){
+  
+  TString outputFile = GetToyMCDir("baseLine", sampleID, -1);
+
+  TString fileListToMerge = "";
+  for (int i = lowseed; i <= highseed; i++){
+    fileListToMerge += GetToyMCDir("baseLine", sampleID, i);
+    fileListToMerge += " ";
+  }
+  
+  gSystem->Exec("hadd " + outputFile + " " + fileListToMerge);
+
+}
+
 
 int main(int argc, char** argv) {
   
@@ -153,6 +169,7 @@ int main(int argc, char** argv) {
 
   bool generate    =  0;
   bool cpvTest     =  0;
+  bool hadd        =  0;
 
   int cpvOption    =  0; 
   int seed         =  1; 
@@ -164,9 +181,11 @@ int main(int argc, char** argv) {
     //Options to do with offline selection
     if       (std::string(argv[i])=="--generate"       ) { generate    =  1         ; i--; }
     else if  (std::string(argv[i])=="--cpv-test"       ) { cpvTest     =  1         ; i--; }
+    else if  (std::string(argv[i])=="--hadd"           ) { hadd        =  1         ; i--; }
     else if  (std::string(argv[i])=="--cpv-opt"        ) { cpvOption   =  atoi(argv[i+1]); }
     else if  (std::string(argv[i])=="--seed"           ) { seed        =  atoi(argv[i+1]); }
     else if  (std::string(argv[i])=="--outdir"         ) { g_outdir    =  argv[i+1];       }
+
     else { 
       std::cout << "Entered invalid argument " << argv[i] << std::endl;
       return 0;
@@ -219,6 +238,7 @@ int main(int argc, char** argv) {
 
   if (generate) GenerateToyMC(seed, component, delta, sampleID );
   if (cpvTest ) CPVTest("nominal", sampleID);
+  if (hadd    ) HAddSamples(1, seed, sampleID);
 
 
 
