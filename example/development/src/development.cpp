@@ -81,7 +81,7 @@ void GenerateToyMC(int seed, int comp, std::complex<double> delta, TString uniqu
 
   
 
-void CPVTest(TString uniqueTag1, TString uniqueTag2){
+void CPVTest(TString uniqueTag1, TString uniqueTag2, int ntoys, int seed ){
   
   PhilippeModelWrapper* fasPhilWrapper = PhilippeModelWrapper::getStaticWrapper();
   fasPhilWrapper->resetModel();  
@@ -106,7 +106,7 @@ void CPVTest(TString uniqueTag1, TString uniqueTag2){
   evtlistwampsDz .setTotAmp(fas.get() );
   evtlistwampsDzb.setTotAmp(fas.get() );
   
-  TRandom3 random(33);
+  TRandom3 random(seed);
   
   TString outdir = g_outdir;
   outdir += "cpvTest/";
@@ -118,13 +118,13 @@ void CPVTest(TString uniqueTag1, TString uniqueTag2){
 
   ModelInspCPAsymmetry cpAys(evtlistwampsDz, evtlistwampsDzb);
   cpAys.createBinningSchemes(100.0, 0.35, 0.1);
-  cpAys.doPeusdoExp(4000, &random);
+  cpAys.doPeusdoExp(ntoys, &random);
   cpAys.makeChiSqPlot(outdir + "ChiSq");
   cpAys.printChi2Breakdown();
   cpAys.makeAysPlots(outdir + "Ays");
   cpAys.saveResults(outdir + "results");
   
-  
+
   CPAsyChi2ResSet results(outdir + "results");
   results.print();
 
@@ -181,7 +181,7 @@ int main(int argc, char** argv) {
 
   int cpvOption    =  0; 
   int seed         =  1; 
-  
+  int ntoys        =  5000;
    
 
   for(int i = 1; i<argc; i=i+2){
@@ -193,6 +193,7 @@ int main(int argc, char** argv) {
     else if  (std::string(argv[i])=="--cpv-opt"        ) { cpvOption   =  atoi(argv[i+1]); }
     else if  (std::string(argv[i])=="--seed"           ) { seed        =  atoi(argv[i+1]); }
     else if  (std::string(argv[i])=="--outdir"         ) { g_outdir    =  argv[i+1];       }
+    else if  (std::string(argv[i])=="--ntoys"          ) { ntoys        =  atoi(argv[i+1]);       }
 
     else { 
       std::cout << "Entered invalid argument " << argv[i] << std::endl;
@@ -245,7 +246,7 @@ int main(int argc, char** argv) {
   }
 
   if (generate) GenerateToyMC(seed, component, delta, sampleID );
-  if (cpvTest ) CPVTest("nominal", sampleID);
+  if (cpvTest ) CPVTest("nominal", sampleID, ntoys, seed);
   if (hadd    ) HAddSamples(1, seed, sampleID);
 
 
