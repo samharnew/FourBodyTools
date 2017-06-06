@@ -14,8 +14,7 @@ ModelInspCPAsymmetry::ModelInspCPAsymmetry(DalitzEventListWithAmps& dzEvts, Dali
   _minBinContent   ( 100  ),
   _minPhaseWidth   ( 0.1  ),
   _minAmpRatioWidth( 0.05 ),
-  _indChisq        ( _dzEvts.at(0).getNumAmps(), std::vector<double>() ),
-  _indChisqStats   ( _dzEvts.at(0).getNumAmps(), WidthFinder()         )
+  _chiSqRes        ( _dzEvts.at(0).getNumAmps() )
 {
   
 } 
@@ -27,15 +26,14 @@ void ModelInspCPAsymmetry::createBinningSchemes(double minBinContent, double min
   _minAmpRatioWidth = minAmpRatioWidth;
   
   for (unsigned i = 0; i < _histsAll.size(); i++){
-  	createBinningSchemes(i);
+    createBinningSchemes(i);
   }
+  
+  fillBinningSchemes(0);
 
-  _totChisq.clear();
-  _totChisqStats = WidthFinder();
-
-  _indChisq      = std::vector< std::vector<double> >( getNumAmps(), std::vector<double>() );
-  _indChisqStats = std::vector<WidthFinder>( getNumAmps(), WidthFinder() );
-
+  _chiSqRes      = CPAsyChi2ResSet( getNumAmps() ); 
+  _chiSqRes.setDataChiSq( getChiSqContainer() );
+  
 }
 
 void ModelInspCPAsymmetry::createBinningSchemes(int component){
@@ -48,51 +46,71 @@ void ModelInspCPAsymmetry::createBinningSchemes(int component){
   HyperPointSet pointsDz  (2);
   HyperPointSet pointsDzb (2);
 
+
   for (int i = 0; i < _dzEvts.size(); i++){
-  	double phase = arg(_dzEvts.at(i).getAmpRelToTot(component));
-  	double ratio = abs(_dzEvts.at(i).getAmpRelToTot(component));
-  	HyperPoint point(phase, ratio);
-  	pointsBoth.push_back(point);
-  	pointsDz  .push_back(point);
+    double phase = arg(_dzEvts.at(i).getAmpRelToTot(component));
+    double ratio = abs(_dzEvts.at(i).getAmpRelToTot(component));
+    if (ratio == 0.0) {
+      std::cout << "Error: The ratio is zero, and I want log(ratio)" << std::endl;
+      continue;
+    }
+    HyperPoint point(phase, log10(ratio) );
+    pointsBoth.push_back(point);
+    pointsDz  .push_back(point);
   }
   for (int i = 0; i < _dzbEvts.size(); i++){
-  	double phase = arg(_dzbEvts.at(i).getAmpRelToTot(component));
-  	double ratio = abs(_dzbEvts.at(i).getAmpRelToTot(component));
-  	HyperPoint point(phase, ratio);
-  	pointsBoth.push_back(point);
-  	pointsDzb .push_back(point);
+    double phase = arg(_dzbEvts.at(i).getAmpRelToTot(component));
+    double ratio = abs(_dzbEvts.at(i).getAmpRelToTot(component));
+    if (ratio == 0.0) {
+      std::cout << "Error: The ratio is zero, and I want log(ratio)" << std::endl;
+      continue;
+    }
+    HyperPoint point(phase, log10(ratio) );
+    pointsBoth.push_back(point);
+    pointsDzb .push_back(point);
   }
   
+  HyperCuboid limits( HyperPoint(-TMath::Pi(), pointsBoth.getMin().at(1) - 0.1 ), HyperPoint(+TMath::Pi(), pointsBoth.getMax().at(1) + 0.1 ) );
 
   HyperPoint  minWidth( _minPhaseWidth, _minAmpRatioWidth ); 
-  HyperCuboid limits( HyperPoint(-TMath::Pi(), 0.0), HyperPoint(+TMath::Pi(), 1.0) );
+  std::vector<int> binningDim; binningDim.push_back(0);
 
-  HyperHistogram hyperHist(limits, pointsBoth, HyperBinningAlgorithms::SMART , 
-  	                                           AlgOption::MinBinWidth(minWidth), 
-  	                                           AlgOption::MinBinContent(_minBinContent) );
+  HyperHistogram hyperHistA(limits, pointsBoth, HyperBinningAlgorithms::MINT , 
+                                               AlgOption::MinBinWidth(TMath::Pi()*0.95), 
+                                               AlgOption::MinBinContent(_minBinContent),
+                                               AlgOption::BinningDimensions(binningDim)
+                                                );
+  
+  HyperHistogram hyperHist(limits, pointsBoth, HyperBinningAlgorithms::MINT , 
+                                               AlgOption::MinBinWidth(minWidth), 
+                                               AlgOption::MinBinContent(_minBinContent),
+                                               AlgOption::StartBinning((HyperBinning&)hyperHistA.getBinning())
+                                               //AlgOption::SnapToGrid(true),
+                                               //AlgOption::GridMultiplier(2)
+                                                );
 
   _histsAll.at(component) = new HyperHistogram(hyperHist.getBinning());
   _histsDz .at(component) = new HyperHistogram(hyperHist.getBinning());
   _histsDzb.at(component) = new HyperHistogram(hyperHist.getBinning());
 
   for (int i = 0; i < _dzEvts.size(); i++){
-  	int binNum = hyperHist.getBinning().getBinNum( pointsDz.at(i) );
-  	_dzBinNums.at(i).at(component) = binNum;
-  	_histsAll.at(component)->fill ( pointsDz.at(i) );
+    int binNum = hyperHist.getBinning().getBinNum( pointsDz.at(i) );
+    _dzBinNums.at(i).at(component) = binNum;
+    _histsAll.at(component)->fill ( pointsDz.at(i) );
   }  
 
-  for (int i = 0; i < _dzEvts.size(); i++){
-  	int binNum = hyperHist.getBinning().getBinNum( pointsDzb.at(i) );
-  	_dzbBinNums.at(i).at(component) = binNum;
-  	_histsAll.at(component)->fill ( pointsDzb.at(i) );
+  for (int i = 0; i < _dzbEvts.size(); i++){
+    int binNum = hyperHist.getBinning().getBinNum( pointsDzb.at(i) );
+    _dzbBinNums.at(i).at(component) = binNum;
+    _histsAll.at(component)->fill ( pointsDzb.at(i) );
   }  
+
 
 }
 
 void ModelInspCPAsymmetry::clearBinningSchemes(){
  
   for (unsigned i = 0; i < _histsAll.size(); i++){
-    //_histsAll.at(i)->clear();
     _histsDz .at(i)->clear();
     _histsDzb.at(i)->clear();
   }
@@ -107,18 +125,27 @@ void ModelInspCPAsymmetry::fillBinningSchemes(TRandom* random){
   for (int i = 0; i < _dzEvts.size(); i++){
     bool dz = true;
     if (random != 0){
-    	if (random->Uniform(0.0,1.0) > 0.5) dz = false;
+      if (random->Rndm() > 0.5) dz = false;
     }
-  	addDzEvtToBinningSchemes(i, dz);
+    addDzEvtToBinningSchemes(i, dz);
   }
   for (int i = 0; i < _dzbEvts.size(); i++){
     bool dz = false;
     if (random != 0){
-    	if (random->Uniform(0.0,1.0) > 0.5) dz = true;
+      if (random->Rndm() > 0.5) dz = true;
     }
-  	addDzbEvtToBinningSchemes(i, dz);
+    addDzbEvtToBinningSchemes(i, dz);
   }
+  
+  normaliseDzbHistsToDz();
 
+}
+
+void ModelInspCPAsymmetry::normaliseDzbHistsToDz(){
+  
+  for (int i = 0; i < getNumAmps(); i++){
+    _histsDzb .at(i)->normalise( _histsDz.at(i)->integral() );
+  }
 
 }
 
@@ -142,6 +169,8 @@ void ModelInspCPAsymmetry::addDzbEvtToBinningSchemes(int evtNum, bool dz){
 
 }
 
+
+
 double ModelInspCPAsymmetry::getChiSq(int component){
   
   if (component != -1){
@@ -161,44 +190,114 @@ double ModelInspCPAsymmetry::getChiSq(int component){
   return chisq;
 }
 
+CPAsyChi2Res ModelInspCPAsymmetry::getChiSqContainer(){
+
+  CPAsyChi2Res results(getNumAmps());
+  
+  for (int i = 0; i < getNumAmps(); i++){
+    results.setChiSq(i, getChiSq(i));
+  }
+  results.setTotChiSq();
+
+  return results;
+  
+}
 
 int ModelInspCPAsymmetry::getNumAmps(){
   return _histsDz.size();
 }
 
 
+
+
 void ModelInspCPAsymmetry::doPeusdoExp(TRandom* random){
 
   fillBinningSchemes(random);
 
-  std::vector<double> chisqvals;
-
-  double totChi2 = 0.0;
-  for (int i = 0; i < getNumAmps(); i++){
-  	double chi2 = getChiSq(i);
-
-  	_indChisq     .at(i).push_back(chi2);
-  	_indChisqStats.at(i).add      (chi2);
-
-  	totChi2 += chi2;
-  }
-
-  _totChisq     .push_back( totChi2 );
-  _totChisqStats.add      ( totChi2 );
+  _chiSqRes.addToyChiSq( getChiSqContainer() );
 
 }
 
 void ModelInspCPAsymmetry::doPeusdoExp(int nExp, TRandom* random){
   
   for (int i = 0; i < nExp; i++){
-  	if (i % 100 == 0) std::cout << "Finished toy " << i << " of " << nExp << std::endl;
-  	doPeusdoExp(random);
+    if (i % 100 == 0) std::cout << "Finished toy " << i << " of " << nExp << std::endl;
+    doPeusdoExp(random);
   }
 
 }
 
 
+HyperHistogram ModelInspCPAsymmetry::getAysHist(int component){
 
+  HyperHistogram* dzHist  = _histsDz .at(component);
+  HyperHistogram* dzbHist = _histsDzb.at(component);  
+  
+  HyperHistogram hist(dzHist->getBinning());
+  hist.setNames( HyperName("#phi [radians]", "r") );
+  hist.asymmetry   (*dzHist, *dzbHist);
+  
+  return hist;
+
+}
+
+HyperHistogram ModelInspCPAsymmetry::getPullHist(int component){
+
+  HyperHistogram* dzHist  = _histsDz .at(component);
+  HyperHistogram* dzbHist = _histsDzb.at(component);  
+  
+  HyperHistogram hist(dzHist->getBinning());
+  hist.setNames( HyperName("#phi [radians]", "r") );
+  hist.pulls   (*dzHist, *dzbHist);
+  
+  return hist;
+
+}
+
+double ModelInspCPAsymmetry::getMaxAbsAys(int component){
+  
+  HyperHistogram hist = getAysHist(component);
+  double min = fabs(hist.getMin());
+  double max = fabs(hist.getMax());
+  return max>min?max:min;
+
+}
+
+double ModelInspCPAsymmetry::getMaxAbsPull(int component){
+  
+  HyperHistogram hist = getPullHist(component);
+  double min = fabs(hist.getMin());
+  double max = fabs(hist.getMax());
+  return max>min?max:min;
+
+}
+
+double ModelInspCPAsymmetry::getMaxAbsAys(){
+  
+  MinMaxFinder stats;
+  for (int i = 0; i < getNumAmps(); i++){
+    stats.add( getMaxAbsAys(i) );
+  }
+  return stats.getMax();
+
+}
+
+double ModelInspCPAsymmetry::getMaxAbsPull(){
+  
+  MinMaxFinder stats;
+  for (int i = 0; i < getNumAmps(); i++){
+    stats.add( getMaxAbsPull(i) );
+  }
+  return stats.getMax();
+
+}
+
+void ModelInspCPAsymmetry::updateHistLimits(){
+
+  _maxAys  = getMaxAbsAys ();
+  _maxPull = getMaxAbsPull();
+
+}
 
 
 void ModelInspCPAsymmetry::makeAysPlots(int component, TString outdir){
@@ -228,8 +327,8 @@ void ModelInspCPAsymmetry::makeAysPlots(int component, TString outdir){
   HyperHistogram hist(dzHist->getBinning());
   hist.setNames( HyperName("#phi [radians]", "r") );
   hist.asymmetry   (*dzHist, *dzbHist);
-  hist.setMin(-1.0);
-  hist.setMax( 1.0);
+  hist.setMin(-_maxAys);
+  hist.setMax( _maxAys);
   hist.draw(outdir + "_Ays", "COLZ Edges1");
 
   //gStyle->SetPalette(kCoffee);
@@ -241,8 +340,8 @@ void ModelInspCPAsymmetry::makeAysPlots(int component, TString outdir){
   double max = fabs(histSig.getMax());
   double min = fabs(histSig.getMin());
   double minmax = max>min?max:min;
-  histSig.setMin(-minmax);
-  histSig.setMax( minmax);
+  histSig.setMin(-_maxPull);
+  histSig.setMax( _maxPull);
   histSig.draw(outdir + "_Pull", "COLZ Edges1");
  
   HyperPlotStyle::setPalette("birdy");
@@ -251,41 +350,245 @@ void ModelInspCPAsymmetry::makeAysPlots(int component, TString outdir){
 
 
 void ModelInspCPAsymmetry::makeAysPlots(TString outdir){
+  
+  updateHistLimits();
 
   for (int i = 0; i < getNumAmps(); i++){
-  	TString istr = ""; istr += i;
+    TString istr = ""; istr += i;
     makeAysPlots( i , outdir + "_amp" + istr );
   }  
 
 }
 
 
-void ModelInspCPAsymmetry::makeChiSqPlot(std::vector<double> chi2vals, double measChisq, TString outdir, bool incMeas){
-  
 
-  WidthFinder stats;
-  
-  int ntoys = chi2vals.size();
 
-  for (int i = 0; i < ntoys; i++){
-    stats.add( chi2vals.at(i) );
+void ModelInspCPAsymmetry::makeChiSqPlot( TString outdir ){
+  
+  _chiSqRes.makeChiSqPlot(outdir);
+
+}
+
+
+
+int ModelInspCPAsymmetry::getNumBins(int component){
+  if (component != -1) return _histsAll.at(component)->getNBins();
+  
+  int nbins = 0;
+  for (int i = 0; i < getNumAmps(); i++){
+    nbins += _histsAll.at(i)->getNBins();
+  }
+  return nbins;
+
+}
+
+
+void ModelInspCPAsymmetry::saveResults(TString outdir){
+  _chiSqRes.saveResults(outdir);
+}
+
+void ModelInspCPAsymmetry::printChi2Breakdown(){
+  _chiSqRes.print();
+}
+
+ModelInspCPAsymmetry::~ModelInspCPAsymmetry(){
+
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+CPAsyChi2Res::CPAsyChi2Res(int nAmps) :
+  _totChisq(0.0),
+  _indChisq(nAmps, 0.0)
+{
+  
+}
+
+void CPAsyChi2Res::setChiSq(int amp, double chi2){
+  _indChisq.at(amp) = chi2;
+}
+
+void CPAsyChi2Res::setTotChiSq(double chi2){
+
+  if (chi2 != -1){
+    _totChisq = chi2;
+    return;
+  }
+  _totChisq = 0.0;
+  for (auto iter = _indChisq.begin(); iter != _indChisq.end(); ++iter){
+    _totChisq += *iter;
   }
 
-  WidthFinder stats2(stats);
-  if (incMeas) stats2.add(measChisq);
+}
+
+double CPAsyChi2Res::getChiSq(int amp){
+  return _indChisq.at(amp);
+}
+
+double CPAsyChi2Res::getTotChiSq(){
+  return _totChisq;
+}
+
+
+
+
+
+int CPAsyChi2Res::getNumAmps(){
+  return _indChisq.size();
+}
   
+CPAsyChi2Res::~CPAsyChi2Res(){
+  
+}
+
+
+
+
+
+
+
+
+
+
+
+
+CPAsyChi2ResSet::CPAsyChi2ResSet(int nAmps) :
+  _dataResults(nAmps),
+  _toyStatsInd(nAmps, WidthFinder() )
+{
+
+}
+
+CPAsyChi2ResSet::CPAsyChi2ResSet(TString filename) :
+  _dataResults(0),
+  _toyStatsInd(0, WidthFinder() )
+{
+  
+  loadResults(filename);
+
+}
+
+int CPAsyChi2ResSet::getNumAmps(){
+  return _dataResults.getNumAmps();
+}
+
+void CPAsyChi2ResSet::setDataChiSq(CPAsyChi2Res results){
+  _dataResults = results;
+}
+
+void CPAsyChi2ResSet::addToyChiSq(CPAsyChi2Res results){
+  _toyResults.push_back(results);
+
+  for (int i = 0; i < getNumAmps(); i++){
+    _toyStatsInd.at(i).add( results.getChiSq(i) );
+  }
+
+  _toyStatsTot.add( results.getTotChiSq() );
+
+}
+
+double CPAsyChi2ResSet::getDataChiSq(int component){
+  if (component == -1) return _dataResults.getTotChiSq();
+  return _dataResults.getChiSq(component);
+}
+
+double CPAsyChi2ResSet::getToyChiSq(int component, int toy){
+  if (component == -1) return _toyResults.at(toy).getTotChiSq();
+  return _toyResults.at(toy).getChiSq(component);
+}
+
+WidthFinder& CPAsyChi2ResSet::getToyStats(int component){
+  if (component == -1) return _toyStatsTot;
+  return _toyStatsInd.at(component);
+}
+
+int CPAsyChi2ResSet::getNumToys(){
+  return _toyResults.size();
+}
+  
+double CPAsyChi2ResSet::getNDOF(int component){
+  double mean = getMean(component);
+  double var  = getVariance(component);
+  double scale = 0.5*(var/mean);
+  double ndof  = mean/scale;  
+  return ndof;
+}
+
+double CPAsyChi2ResSet::getScale(int component){
+  double mean = getMean(component);
+  double var  = getVariance(component);
+  double scale = 0.5*(var/mean);
+  return scale;
+}
+
+double CPAsyChi2ResSet::getVariance(int component){
+  return getToyStats(component).varience();
+}
+
+double CPAsyChi2ResSet::getMean(int component){
+  return getToyStats(component).mean();
+}
+
+double CPAsyChi2ResSet::getProb(int component){
+  double ndof  = getNDOF      (component);
+  double scale = getScale     (component);
+  double chi2  = getDataChiSq (component);
+  double prob  = TMath::Prob(chi2/scale, floor(ndof) );
+  return prob;
+}
+
+double CPAsyChi2ResSet::getSig(int component){
+  double prob = getProb(component);
+  return fabs(TMath::NormQuantile( prob/2.0 ));
+}
+
+
+void CPAsyChi2ResSet::makeChiSqPlot(int component, TString outdir, bool incMeas){
+  
+  WidthFinder stats( getToyStats(component) );
+  if (incMeas) stats.add( getDataChiSq( component ) );
+
   int nbins = 100;
-  double min = stats2.getMin() - stats2.range()*0.05;
-  double max = stats2.getMax() + stats2.range()*0.05;
+  double min = stats.getMin() - stats.range()*0.05;
+  double max = stats.getMax() + stats.range()*0.05;
   double binWid = (max - min)/double(nbins);
+  
+  int ntoys = getNumToys();
 
   TH1D hist( "chisq", "chisq", nbins, min, max );
   for (int i = 0; i < ntoys; i++){
-    hist.Fill( chi2vals.at(i) );
+    hist.Fill( getToyChiSq(component, i) );
   }
   
-  double var  = stats.varience();
-  double mean = stats.mean    ();
+  double var  = getVariance(component);
+  double mean = getMean    (component);
 
   double scale = 0.5*(var/mean);
   double ndof  = mean/scale;
@@ -313,7 +616,7 @@ void ModelInspCPAsymmetry::makeChiSqPlot(std::vector<double> chi2vals, double me
   plotter.addText( "ndof  = " + strNdofScaled, 0.63, 0.79-0.1, 1, 2, 0.065, true, kRed  );
   plotter.addText( "scale = " + strScale     , 0.63, 0.79-0.2, 1, 2, 0.065, true, kRed  );
 
-  if (incMeas) plotter.addVerticalLine(measChisq, 1, kRed );
+  if (incMeas) plotter.addVerticalLine( getDataChiSq(component), 1, kRed );
   plotter.plot(outdir);
   plotter.setMin(0.5);
   plotter.logY();
@@ -322,110 +625,151 @@ void ModelInspCPAsymmetry::makeChiSqPlot(std::vector<double> chi2vals, double me
 
 }
 
-void ModelInspCPAsymmetry::makeChiSqPlot( TString outdir ){
+void CPAsyChi2ResSet::makeChiSqPlot( TString outdir ){
   
-  std::vector<double> indChi2;
-
-  fillBinningSchemes();
-
-  double totChi2 = 0.0;
-
   for (int i = 0; i < getNumAmps(); i++){
-  	TString istr = ""; istr += i;
-    double chisq = getChiSq(i);
-    makeChiSqPlot( _indChisq.at(i), chisq , outdir + "_amp" + istr + "_incMeas", true  );
-    makeChiSqPlot( _indChisq.at(i), chisq , outdir + "_amp" + istr , false );
-
-    totChi2 += chisq;
+    TString istr = ""; istr += i;
+    makeChiSqPlot( i , outdir + "_amp" + istr + "_incMeas", true  );
+    makeChiSqPlot( i , outdir + "_amp" + istr             , false );
   }
 
-  makeChiSqPlot( _totChisq, totChi2 , outdir + "_incMeas", true   );
-  makeChiSqPlot( _totChisq, totChi2 , outdir, false  );
-
+  makeChiSqPlot( -1 , outdir + "_incMeas", true   );
+  makeChiSqPlot( -1 , outdir             , false  );
 
 }
 
-double ModelInspCPAsymmetry::getNDOF(int component){
-  double mean = getMean(component);
-  double var  = getVariance(component);
-  double scale = 0.5*(var/mean);
-  double ndof  = mean/scale;  
-  return ndof;
-}
+void CPAsyChi2ResSet::saveResults(TString outdir){
 
-double ModelInspCPAsymmetry::getScale(int component){
-  double mean = getMean(component);
-  double var  = getVariance(component);
-  double scale = 0.5*(var/mean);
-  return scale;
-}
+  TFile file(outdir + ".root", "RECREATE");
 
-double ModelInspCPAsymmetry::getVariance(int component){
-  if (component == -1) return _totChisqStats      .varience();
-  return _indChisqStats.at(component).varience();
-}
-
-double ModelInspCPAsymmetry::getMean(int component){
-  if (component == -1) return _totChisqStats      .mean();
-  return _indChisqStats.at(component).mean();
-}
-
-double ModelInspCPAsymmetry::getProb(int component){
-  double ndof  = getNDOF  (component);
-  double scale = getScale (component);
-  double chi2  = getChiSq (component);
-  double prob  = TMath::Prob(chi2/scale, floor(ndof) );
-  return prob;
-}
-
-double ModelInspCPAsymmetry::getSig(int component){
-  double prob = getProb(component);
-  return fabs(TMath::NormQuantile( prob/2.0 ));
-}
-
-int ModelInspCPAsymmetry::getNumBins(int component){
-  if (component != -1) return _histsAll.at(component)->getNBins();
+  TTree* treeToys = new TTree("ChiSqFromToys", "ChiSqFromToys");
+  TTree* treeData = new TTree("ChiSqFromData", "ChiSqFromData");
   
-  int nbins = 0;
+  std::vector<double*> chi2val;
+
   for (int i = 0; i < getNumAmps(); i++){
-  	nbins += _histsAll.at(i)->getNBins();
+    TString branchname = "amp";
+    branchname += i;
+    chi2val.push_back(new double(0.0));
+    treeToys->Branch(branchname, chi2val.back());
+    treeData->Branch(branchname, chi2val.back());
   }
-  return nbins;
+  
+    
+  for (unsigned j = 0; j < getNumToys(); j++){
+    for (int i = 0; i < getNumAmps(); i++){
+      *chi2val.at(i) = getToyChiSq(i, j);
+    }
+    treeToys->Fill();
+  }
+
+  for (int i = 0; i < getNumAmps(); i++){
+    *chi2val.at(i) = getDataChiSq(i);
+  }  
+  treeData->Fill();
+
+  treeToys->Write();
+  treeData->Write();  
+
+  file.Close();
 
 }
 
 
-void ModelInspCPAsymmetry::printChi2Breakdown(){
+void CPAsyChi2ResSet::loadResults(TString outdir){
 
-  std::vector<double> indChi2;
+  TFile file(outdir + ".root", "READ");
 
-  fillBinningSchemes();
+  TTree* treeToys = (TTree*)file.Get("ChiSqFromToys");
+  TTree* treeData = (TTree*)file.Get("ChiSqFromData");
+  
+  int nAmps = 0;
+  bool branchExists = true;
+  while (branchExists){
+    TString branchname = "amp";
+    branchname += nAmps;
+    if (treeToys->GetListOfBranches()->FindObject(branchname) == 0) break;
+    nAmps++;
+  }
+  
+  std::cout << "Loading file with " << nAmps << " components" << std::endl;
+
+  _dataResults = CPAsyChi2Res(nAmps);
+  _toyStatsInd = std::vector<WidthFinder>(nAmps, WidthFinder());
+
+  std::vector<double*> chi2val;
+  
+  for (int i = 0; i < getNumAmps(); i++){
+    TString branchname = "amp";
+    branchname += i;
+    chi2val.push_back(new double(0.0));
+    treeToys->SetBranchAddress(branchname, chi2val.back());
+    treeData->SetBranchAddress(branchname, chi2val.back());
+  }
+  
+
+  for (int j = 0; j < treeToys->GetEntries(); j++){
+    treeToys->GetEntry(j);
+    
+    CPAsyChi2Res toyRes( getNumAmps() );
+    for (int i = 0; i < getNumAmps(); i++){
+      toyRes.setChiSq(i, *chi2val.at(i));
+    }
+    toyRes.setTotChiSq();
+    
+    addToyChiSq(toyRes);
+
+  }
+
+  treeData->GetEntry(0);
+  
+  CPAsyChi2Res dataRes( getNumAmps() );
+  for (int i = 0; i < getNumAmps(); i++){
+    dataRes.setChiSq(i, *chi2val.at(i));
+  }
+  dataRes.setTotChiSq();
+  
+  setDataChiSq(dataRes); 
+
+
+  file.Close();
+
+}
+
+
+
+void CPAsyChi2ResSet::print(){
+
   
   std::cout << "--------------- ALL HISTS ----------------" << std::endl;
-  std::cout << "chi2  = " << getChiSq(-1) << std::endl; 
+  std::cout << "chi2  = " << getDataChiSq(-1) << std::endl; 
   std::cout << "ndof  = " << getNDOF(-1) << std::endl;
   std::cout << "scale = " << getScale(-1) << std::endl;
   std::cout << "pval  = " << getProb(-1) << std::endl;
   std::cout << "sigma = " << getSig (-1) << std::endl;
-  std::cout << "nbins = " << getNumBins (-1) << std::endl;
 
   for (int i = 0; i < getNumAmps(); i++){
     std::cout << "------------- HIST " << i << " ----------------" << std::endl;
-    std::cout << "chi2  = " << getChiSq(i) << std::endl; 
+    std::cout << "chi2  = " << getDataChiSq(i) << std::endl; 
     std::cout << "ndof  = " << getNDOF (i) << std::endl;
     std::cout << "scale = " << getScale(i) << std::endl;    
     std::cout << "pval  = " << getProb(i) << std::endl;
     std::cout << "sigma = " << getSig (i) << std::endl;
-    std::cout << "nbins = " << getNumBins (i) << std::endl;
   }
 
 
 
 }
 
-ModelInspCPAsymmetry::~ModelInspCPAsymmetry(){
 
+
+
+
+CPAsyChi2ResSet::~CPAsyChi2ResSet(){
 
 }
+
+
+
 
 

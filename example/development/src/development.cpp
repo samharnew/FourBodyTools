@@ -87,6 +87,8 @@ void CPVTest(TString uniqueTag1, TString uniqueTag2){
   fasPhilWrapper->resetModel();  
   MINT::counted_ptr<FitAmpSum> fas   = fasPhilWrapper->getFitAmpSum  ();    
   
+  TString modelName = fasPhilWrapper->getModelName();
+
   DalitzEventPattern pat(421, -211, 211, 211, -211);
 
   DalitzEventList eventlistdz;
@@ -111,14 +113,20 @@ void CPVTest(TString uniqueTag1, TString uniqueTag2){
   gSystem->Exec("mkdir -p " + outdir);
   outdir += uniqueTag1 + "_" + uniqueTag2 + "/";
   gSystem->Exec("mkdir -p " + outdir);
+  outdir += modelName + "/";
+  gSystem->Exec("mkdir -p " + outdir);
 
   ModelInspCPAsymmetry cpAys(evtlistwampsDz, evtlistwampsDzb);
-  cpAys.createBinningSchemes(100.0, 0.35, 0.06);
+  cpAys.createBinningSchemes(100.0, 0.35, 0.1);
   cpAys.doPeusdoExp(4000, &random);
   cpAys.makeChiSqPlot(outdir + "ChiSq");
   cpAys.printChi2Breakdown();
   cpAys.makeAysPlots(outdir + "Ays");
+  cpAys.saveResults(outdir + "results");
   
+  
+  CPAsyChi2ResSet results(outdir + "results");
+  results.print();
 
   //ModelInspCPVFitter fitter(evtlistwampsDz, evtlistwampsDzb);
   //
@@ -158,7 +166,7 @@ void HAddSamples(int lowseed, int highseed, TString sampleID){
     fileListToMerge += " ";
   }
   
-  gSystem->Exec("hadd " + outputFile + " " + fileListToMerge);
+  gSystem->Exec("hadd -f " + outputFile + " " + fileListToMerge);
 
 }
 

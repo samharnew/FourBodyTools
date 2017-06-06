@@ -32,6 +32,82 @@
 #include "TMathBase.h"
 #include "TApplication.h"
 
+
+class CPAsyChi2Res {
+
+  double              _totChisq;
+  std::vector<double> _indChisq;   
+  
+  public:
+  
+  CPAsyChi2Res(int nAmps);
+
+  void setChiSq(int amp, double chi2);
+  
+  void setTotChiSq(double chi2 = -1);
+  double getChiSq(int amp);
+  double getTotChiSq();
+
+  int getNumAmps();
+  
+  ~CPAsyChi2Res();
+
+};
+
+class CPAsyChi2ResSet {
+
+  std::vector<CPAsyChi2Res> _toyResults;
+  CPAsyChi2Res _dataResults;  
+  
+  std::vector<WidthFinder> _toyStatsInd;
+  WidthFinder _toyStatsTot;
+
+  public:
+
+  CPAsyChi2ResSet(int nAmps);
+  CPAsyChi2ResSet(TString filename);
+
+  int getNumAmps();
+  
+  void setDataChiSq(CPAsyChi2Res results);
+
+  void addToyChiSq(CPAsyChi2Res results);
+  
+  double getToyChiSq(int component, int toy);
+
+  WidthFinder& getToyStats(int component);
+
+
+  double getDataChiSq(int component);
+  
+  int getNumToys();
+    
+  double getNDOF(int component);
+  
+  double getScale(int component);
+  
+  double getVariance(int component);
+  
+  double getMean(int component);
+  double getProb(int component);
+  double getSig(int component);
+
+
+  void makeChiSqPlot(int component, TString outdir, bool incMeas);
+  void makeChiSqPlot( TString outdir );
+
+  void saveResults(TString outdir);
+  void loadResults(TString outdir);
+
+  void print();
+
+
+  ~CPAsyChi2ResSet();
+
+
+};
+
+
 class ModelInspCPAsymmetry {
   
   DalitzEventListWithAmps _dzEvts ; 
@@ -52,11 +128,12 @@ class ModelInspCPAsymmetry {
   double _minAmpRatioWidth;
 
   //save the chi2 values that are found from peusdo experiements
-  std::vector<double>                _totChisq;
-  std::vector< std::vector<double> > _indChisq;
-  WidthFinder                        _totChisqStats;
-  std::vector<WidthFinder>           _indChisqStats;
-
+  CPAsyChi2ResSet _chiSqRes;
+  
+  //save some limits for the 2D plotting so they can be common among 
+  //all plots
+  double _maxAys ;
+  double _maxPull;
 
   public: 
 
@@ -70,25 +147,35 @@ class ModelInspCPAsymmetry {
   void fillBinningSchemes(TRandom* random = 0);
   void addDzEvtToBinningSchemes(int evtNum, bool dz = true);
   void addDzbEvtToBinningSchemes(int evtNum, bool dz = true);
+  
+  void normaliseDzbHistsToDz();
 
   void clearBinningSchemes();
   
   double getChiSq(int component);
+  CPAsyChi2Res getChiSqContainer();
   
+
   void doPeusdoExp(TRandom* random);
   void doPeusdoExp(int nExp, TRandom* random);
 
-  void makeChiSqPlot( std::vector<double> chi2vals, double measChisq, TString outdir, bool incMeas );
   void makeChiSqPlot( TString outdir );
 
-  double getNDOF(int component);
-  double getProb(int component);
-  double getSig(int component);
   int getNumBins(int component);
-  double getVariance(int component);
-  double getMean(int component);
-  double getScale(int component);
 
+
+  HyperHistogram getAysHist (int component);
+  HyperHistogram getPullHist(int component);
+  
+  double getMaxAbsAys(int component);
+  double getMaxAbsPull(int component);
+  
+  double getMaxAbsAys();
+  double getMaxAbsPull();
+
+  void updateHistLimits();
+
+  void saveResults(TString outdir);
   void printChi2Breakdown();
 
   void makeAysPlots(int component, TString outdir);
@@ -98,6 +185,11 @@ class ModelInspCPAsymmetry {
   ~ModelInspCPAsymmetry();
 
 };
+
+
+
+
+
 
 
 #endif
