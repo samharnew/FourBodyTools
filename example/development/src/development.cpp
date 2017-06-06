@@ -79,7 +79,19 @@ void GenerateToyMC(int seed, int comp, std::complex<double> delta, TString uniqu
 
 }
 
+void HAddSamples(int lowseed, int highseed, TString sampleID){
   
+  TString outputFile = GetToyMCDir("baseLine", sampleID, -1);
+
+  TString fileListToMerge = "";
+  for (int i = lowseed; i <= highseed; i++){
+    fileListToMerge += GetToyMCDir("baseLine", sampleID, i);
+    fileListToMerge += " ";
+  }
+  
+  gSystem->Exec("hadd -f " + outputFile + " " + fileListToMerge);
+
+}  
 
 void CPVTest(TString uniqueTag1, TString uniqueTag2, int ntoys, int seed ){
   
@@ -128,48 +140,85 @@ void CPVTest(TString uniqueTag1, TString uniqueTag2, int ntoys, int seed ){
   CPAsyChi2ResSet results(outdir + "results");
   results.print();
 
-  //ModelInspCPVFitter fitter(evtlistwampsDz, evtlistwampsDzb);
-  //
-  //double neg2LLHnoCPV = fitter.getVal();
-  //
-  //std::vector<double> sigs;
+}
 
-  //for (int i = 0; i < 14; i++){
-  //  fitter.setComponentToFit(i);
-  //  fitter.fit(0);  
-  //  double cpvVal = fitter.getVal();
-  //  std::cout << "-----------------------------" << std::endl;
-  //  std::cout <<   " sig = " << sqrt(neg2LLHnoCPV - cpvVal) << std::endl;
-  //  sigs.push_back( sqrt(neg2LLHnoCPV - cpvVal) );
-  //  
-  //  TString istr = ""; istr += i;
-  //  fitter.makePlot("CPVSearch_" + istr);
-  //  std::cout << "-----------------------------" << std::endl;
-  //}
-  //
-  //
-  //for (int i = 0; i < 14; i++){
-  //  std::cout << "-----------------------------" << std::endl;
-  //  std::cout << i << " :    sig = " << sigs.at(i) << std::endl;
-  //  std::cout << "-----------------------------" << std::endl;
-  //}
+inline bool fileExists(const std::string& name) {
+  std::ifstream f(name.c_str());
+  return f.good();
+}
+
+void ResultsTable( std::ostream& os, TString uniqueTag1, TString uniqueTag2, TString genModel, std::vector<TString> altModels, bool header, bool footer ){
+  
+  TString outdir = g_outdir;
+  outdir += "cpvTest/";
+  outdir += uniqueTag1 + "_" + uniqueTag2 + "/";
+
+  CPAsyChi2ResSet results(outdir + genModel + "/results");
+  
+  double pvalue = results.getProb(-1);
+  
+  WidthFinder stats;
+  for (unsigned i = 0; i < altModels.size(); i++){
+    TString filename = outdir + altModels.at(i) + "/results";
+    if ( fileExists(filename.Data()) == false ){
+      std::cout << "Could not find a results file at " << filename << std::endl;
+      continue;
+    }
+    CPAsyChi2ResSet resultsAlt(filename);
+    stats.add( resultsAlt.getProb(-1) );
+  }
+
+  if (header){
+    os << "\\begin{tabular}{ l | l | l }" << std::endl;
+    os << "\\hline" << std::endl;
+    os << "CPV Sample & p-value (nominal model) & p-value range (alt. models) \\\\" << std::endl;
+    os << "\\hline" << std::endl;
+  }
+
+  os << std::setw(20) << std::left << uniqueTag2 << " & " 
+     << std::setw(20) << std::left << pvalue << " & " 
+     << std::setw(20) << std::left << stats.getMin() << " , " << std::left << stats.getMax() << "\\\\" << std::endl;
+
+  if (footer){
+    os << "\\end{tabular}" << std::endl;    
+  }
 
 }
 
-void HAddSamples(int lowseed, int highseed, TString sampleID){
+void ResultsTable( ){
   
-  TString outputFile = GetToyMCDir("baseLine", sampleID, -1);
+  std::ofstream myfiletex;
+  myfiletex.open (g_outdir + "ResultsTable.tex");   
 
-  TString fileListToMerge = "";
-  for (int i = lowseed; i <= highseed; i++){
-    fileListToMerge += GetToyMCDir("baseLine", sampleID, i);
-    fileListToMerge += " ";
+  TString nomModel = "baseLine";
+
+  std::vector<TString> altModels;
+  altModels.push_back("altModel1");
+  altModels.push_back("altModel2");
+  altModels.push_back("altModel3");
+  altModels.push_back("altModel4");
+  altModels.push_back("altModel5");
+  altModels.push_back("extended" );
+  altModels.push_back("noA11640" );
+  altModels.push_back("noPi1300" );
+  
+  std::vector<TString> cpvSamples;
+  cpvSamples.push_back("a1-mag" );
+  cpvSamples.push_back("a1-pha" );
+  cpvSamples.push_back("rhorhoD-mag" );
+  cpvSamples.push_back("rhorhoD-pha" );
+  cpvSamples.push_back("rhorhoP-mag" );
+  cpvSamples.push_back("rhorhoP-pha" );
+
+  int nsamples = cpvSamples.size();
+  
+  for (int i = 0; i < nsamples; i++){
+    ResultsTable(myfiletex, "nominal", cpvSamples.at(i), nomModel, altModels, i==0, i==nsamples-1);
   }
   
-  gSystem->Exec("hadd -f " + outputFile + " " + fileListToMerge);
+  myfiletex.close();
 
 }
-
 
 int main(int argc, char** argv) {
   
@@ -178,6 +227,7 @@ int main(int argc, char** argv) {
   bool generate    =  0;
   bool cpvTest     =  0;
   bool hadd        =  0;
+  bool resultsTab  =  0;
 
   int cpvOption    =  0; 
   int seed         =  1; 
@@ -193,7 +243,8 @@ int main(int argc, char** argv) {
     else if  (std::string(argv[i])=="--cpv-opt"        ) { cpvOption   =  atoi(argv[i+1]); }
     else if  (std::string(argv[i])=="--seed"           ) { seed        =  atoi(argv[i+1]); }
     else if  (std::string(argv[i])=="--outdir"         ) { g_outdir    =  argv[i+1];       }
-    else if  (std::string(argv[i])=="--ntoys"          ) { ntoys        =  atoi(argv[i+1]);       }
+    else if  (std::string(argv[i])=="--ntoys"          ) { ntoys       =  atoi(argv[i+1]);       }
+    else if  (std::string(argv[i])=="--results-table"  ) { resultsTab  =  atoi(argv[i+1]);       }
 
     else { 
       std::cout << "Entered invalid argument " << argv[i] << std::endl;
@@ -245,10 +296,10 @@ int main(int argc, char** argv) {
     sampleID  = "rhorhoP-pha";
   }
 
-  if (generate) GenerateToyMC(seed, component, delta, sampleID );
-  if (cpvTest ) CPVTest("nominal", sampleID, ntoys, seed);
-  if (hadd    ) HAddSamples(1, seed, sampleID);
-
+  if (generate  ) GenerateToyMC(seed, component, delta, sampleID );
+  if (cpvTest   ) CPVTest("nominal", sampleID, ntoys, seed);
+  if (hadd      ) HAddSamples(1, seed, sampleID);
+  if (resultsTab) ResultsTable();
 
 
   return 0;
